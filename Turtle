@@ -1,0 +1,44 @@
+import pandas as pd
+import numpy as np
+import matplotlib as mpl
+
+
+# import the data
+SHCI = pd.read_csv('table.csv')
+# aescend the data
+SHCI.sort('Date', inplace = True)
+print(SHCI.head())
+# set the MA days
+N1 = 20
+N2 = 10
+
+# calculate N1 days high
+SHCI['N1high'] = pd.rolling_max(SHCI['High'], N1)
+SHCI['N1high'].fillna(value = pd.expanding_max(SHCI['High']), inplace = True)
+
+# calculate N2 days low
+SHCI['N2low'] = pd.rolling_min(SHCI['Low'], N2)
+SHCI['N2low'].fillna(value = pd.expanding_min(SHCI['Low']), inplace = True)
+
+
+# buy and sell signal
+
+buy = SHCI[SHCI['Close'] > SHCI['N1high'].shift(1)].index
+SHCI.loc[buy, 'signal'] = 1
+
+
+sell = SHCI[SHCI['Close'] < SHCI['N2low'].shift(1)].index
+SHCI.loc[sell, 'signal'] = 0
+SHCI['signal'].fillna(method = 'ffill', inplace = True)
+
+# current position
+
+SHCI['position'] = SHCI['signal'].shift(1)
+SHCI['signal'].fillna(value = 0, inplace = True)
+
+SHCI['change']= SHCI['Close'] /SHCI['Close'].shift(1)-1
+SHCI['value'] = 1
+
+SHCI['value'] = (SHCI['change']*SHCI['position']+1).cumprod()
+print (SHCI)
+SHCI.to_csv('sss.csv', index = False)
