@@ -1,0 +1,47 @@
+import pandas as pd
+import numpy as np
+import matplotlib as plt
+
+def AIP(ticker, start_date, end_date):
+    index_data = pd.read_csv(str(ticker)+".csv", index_col= ['Date'])
+    index_data.index = pd.to_datetime(index_data.index, dayfirst = True)
+    index_data = index_data[['Ticker', 'Close']].sort_index()
+    index_data = index_data[start_date: end_date]
+    index_data['RF'] = (4.0/100 + 1) ** (1.0/250) -1
+    index_data['RF_net'] = (index_data['RF'] + 1).cumprod()
+
+    # the first day of every month to buy
+    by_month = index_data.resample('M', kind = 'period').first()
+
+    # automatic purchase
+    trade_log = pd.DataFrame(index = by_month.index)
+    trade_log['Net_value'] = by_month['Close'] /1000
+    trade_log['Money'] = 1000
+    trade_log['Shares'] = trade_log['Money'] / trade_log['Net_value']
+    trade_log['Total_shares'] = trade_log['Shares'].cumsum()
+    trade_log['Total_investment'] = trade_log['Money'].cumsum()
+
+    # risk free return
+    trade_log['RF_shares'] = trade_log['Money'] / by_month['RF_net']
+    trade_log['Total_RF_shares'] = trade_log['RF_shares'].cumsum()
+    
+
+    temp = trade_log.resample('D', fill_method = 'ffill')
+    index_data = index_data.to_period('D')
+
+    daily_data = pd.concat([index_data, temp], axis = 1, join = 'inner')
+    daily_data['AIP'] = daily_data['Close'] /1000 * daily_data['Total_shares']
+    daily_data['Riskfree'] = index_data['RF_net'] * daily_data['Total_RF_shares']
+
+    return daily_data
+
+# run the programme
+df = AIP('000001', '2007-10-01','2009-07-31')
+print (df[['Total_investment', 'AIP', 'Riskfree']].iloc[[0,-1],])
+df.to_csv('RESULT.csv',index = False)
+
+# draw the return
+df[['AIP', 'Riskfree']].plot(figsize = (12,6))
+df['Close'].plot(secondary_y = True)
+plt.pyplot.legend(['Close'], loc = 'best')
+plt.pyplot.show()
